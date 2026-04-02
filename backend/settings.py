@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -80,8 +81,16 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'mssql',
+        'NAME': 'titanic_db',  # 替换为我在Azure创建的数据库名称
+        'USER': 'titanic_admin',  # 替换为我的Azure数据库管理员登录名
+        'PASSWORD': os.environ.get('AZURE_SQL_PASSWORD', ''),  # 从环境变量中读取密码
+        'HOST': 'titanic-server-siying.database.windows.net',  # 替换为我服务器全称，格式：服务器名.database.windows.net
+        'PORT': '1433',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 18 for SQL Server',
+            'extra_params': 'Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30',
+        },
     }
 }
 
