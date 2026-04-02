@@ -25,7 +25,12 @@ SECRET_KEY = 'django-insecure-4!wi9c&i#94+mp5n=)$y_5mhq^2ugx!b($2y#ist)k*v9a7adw
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'titanic-survival-predict-hwcfd0b0g5c3cabz.westeurope-01.azurewebsites.net',
+    'localhost',
+    '127.0.0.1',
+    '169.254.129.2',          # 内部健康检查的 IP
+]
 
 
 # Application definition
