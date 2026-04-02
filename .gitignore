@@ -5,7 +5,6 @@ db.sqlite3
 *.log
 .venv/
 .ipynb_checkpoints/
-*.pkl
 *.joblib
 .vscode/
 .idea/
