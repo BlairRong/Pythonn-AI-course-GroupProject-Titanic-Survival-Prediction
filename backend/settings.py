@@ -30,10 +30,11 @@ ALLOWED_HOSTS = [
     'titanic-survival-predict-hwcfd0b0g5c3cabz.westeurope-01.azurewebsites.net',
     'localhost',
     '127.0.0.1',
-    '169.254.129.2',          # 内部健康检查的 IP
 ]
 
-
+CSRF_TRUSTED_ORIGINS = [
+    'https://titanic-survival-predict-hwcfd0b0g5c3cabz.westeurope-01.azurewebsites.net'
+]
 # Application definition
 
 INSTALLED_APPS = [
