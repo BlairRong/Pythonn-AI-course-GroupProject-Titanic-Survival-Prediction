@@ -10,6 +10,10 @@ from .models import PredictionRecord
 from pathlib import Path
 from django.contrib import messages
 
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from azure.storage.blob import BlobServiceClient
+
 # To train the model-  python -m ML.model_training.train
 # Set up logging to catch errors in the console/logs
 logger = logging.getLogger(__name__)
@@ -157,3 +161,25 @@ class PredictionListView(ListView):
     context_object_name = "predictions"
     ordering = ["-created_at"]  # newest first
     paginate_by = 20  # optional
+
+
+#upload the file to storage - Azure Blob Storage
+def upload_file(request):
+    message = None
+    if request.method == 'POST' and request.FILES.get('myfile'):
+        uploaded_file = request.FILES['myfile']
+        
+        # use Azure Blob Storage save file
+        blob_service_client = BlobServiceClient.from_connection_string(settings.AZURE_STORAGE_CONN_STR)
+        container_name = "django-uploads"
+        # Ensure the container exists (create it first, but assume it has already been created manually).
+        try:
+            blob_service_client.create_container(container_name)
+        except:
+            pass  # The container already exists.
+        
+        blob_client = blob_service_client.get_blob_client(container=container_name, blob=uploaded_file.name)
+        blob_client.upload_blob(uploaded_file.read(), overwrite=True)
+        message = f"file {uploaded_file.name} uploaded to Azure Storage"
+    
+    return render(request, 'upload.html', {'message': message})

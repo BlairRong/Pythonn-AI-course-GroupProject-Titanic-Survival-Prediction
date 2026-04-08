@@ -86,11 +86,11 @@ DATABASES = {
         'NAME': 'titanic_db',  # 替换为我在Azure创建的数据库名称
         'USER': 'titanic_admin',  # 替换为我的Azure数据库管理员登录名
         'PASSWORD': os.environ.get('AZURE_SQL_PASSWORD', ''),  # 从环境变量中读取密码
-        'HOST': 'titanic-server-siying.database.windows.net',  # 替换为我服务器全称，格式：服务器名.database.windows.net
+        'HOST': 'titaninc-server-siying.database.windows.net',  # 替换为我服务器全称，格式：服务器名.database.windows.net
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 18 for SQL Server',
-            'extra_params': 'Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30',
+            'extra_params': 'Encrypt=yes;TrustServerCertificate=no;Connection Timeout=120',
         },
     }
 }
@@ -136,3 +136,23 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+#implementation storage conn str 存储连接字符串 使用环境变量 to Django project
+AZURE_STORAGE_CONN_STR = os.environ.get('AZURE_STORAGE_CONNECTION_STRING', '')
+
+
+
+LOGGING = {
+    'version': 1,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django.db.backends': {
+            'level': 'DEBUG',
+            'handlers': ['console'],
+        },
+    },
+}
