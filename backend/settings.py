@@ -94,6 +94,7 @@ DATABASES = {
         },
     }
 }
+print(">>> AZURE_SQL_PASSWORD:", os.environ.get('AZURE_SQL_PASSWORD'))
 
 
 # Password validation

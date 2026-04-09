@@ -2,9 +2,8 @@ import os
 from azure.storage.blob import BlobServiceClient
 
 # Connection string (copied from Azure portal) 连接字符串（从 Azure 门户复制）
-conn_str = conn_str = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
+conn_str =  os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
 
-# create 创建 BlobServiceClient
 blob_service_client = BlobServiceClient.from_connection_string(conn_str)
 
 # 1. Create a container (equivalent to a folder).创建容器（相当于文件夹）

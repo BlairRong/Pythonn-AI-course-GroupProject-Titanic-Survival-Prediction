@@ -182,4 +182,4 @@ def upload_file(request):
         blob_client.upload_blob(uploaded_file.read(), overwrite=True)
         message = f"file {uploaded_file.name} uploaded to Azure Storage"
     
-    return render(request, 'upload.html', {'message': message})
+    return render(request, 'webapp/upload.html', {'message': message})
