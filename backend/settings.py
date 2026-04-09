@@ -157,3 +157,14 @@ LOGGING = {
         },
     },
 }
+
+
+#Azure Cosmos DB
+COSMOS_DB_URL = os.environ.get('COSMOS_DB_URL', '')
+COSMOS_DB_KEY = os.environ.get('COSMOS_DB_KEY', '')
+COSMOS_DB_DATABASE = 'titanicDB'
+COSMOS_DB_CONTAINER = 'predictions'
+
+
+#terminal: export COSMOS_DB_URL="my URI"
+#terminal: export COSMOS_DB_KEY="my KEY"
