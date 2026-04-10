@@ -2,7 +2,7 @@
 
 {% block content %}
 <h2>Cosmos DB Prediction History</h2>
-<table border="1" cellpadding="5">
+<table class="table table-striped">
     <thead>
         <tr>
             <th>ID</th>
@@ -14,7 +14,7 @@
         </tr>
     </thead>
     <tbody>
-        {% for item in items %}
+        {% for item in cosmos_items %}
         <tr>
             <td>{{ item.id }}</td>
             <td>{{ item.userId }}</td>
@@ -28,4 +28,5 @@
         {% endfor %}
     </tbody>
 </table>
+<a href="{% url 'prediction_list' %}" class="btn btn-secondary">View SQLite history</a>
 {% endblock %}
