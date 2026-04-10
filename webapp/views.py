@@ -217,4 +217,14 @@ def upload_file(request):
     return render(request, 'webapp/upload.html', {'message': message})
 
 
-
+#Azure Comsmos Architecture Design.
+#Create and display a view that reads data from Cosmos DB.创建读取 Cosmos DB 数据并显示的视图
+def cosmos_history(request):
+    cosmos = CosmosService()
+    try:
+        # Retrieve the latest 10 records, sorted in descending order of time (if document has a timestamp field).查询最新的 10 条记录，按时间倒序（如果文档有 timestamp 字段）
+        items = cosmos.get_items(query="SELECT TOP 10 * FROM c ORDER BY c.timestamp DESC")
+    except Exception as e:
+        items = []
+        logger.error(f"Failed to fetch from Cosmos DB: {e}")
+    return render(request, 'webapp/cosmos_history.html', {'items': items})
