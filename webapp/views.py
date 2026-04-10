@@ -219,15 +219,11 @@ def upload_file(request):
 
 #Azure Comsmos Architecture Design.
 #Create and display a view that reads data from Cosmos DB.创建读取 Cosmos DB 数据并显示的视图
+
 def cosmos_history(request):
+    #Displays the prediction records stored in Cosmos DB.显示 Cosmos DB 中存储的预测记录
     cosmos = CosmosService()
-    try:
-        # Retrieve the latest 10 records, sorted in descending order of time (if document has a timestamp field).查询最新的 10 条记录，按时间倒序（如果文档有 timestamp 字段）
-        items = cosmos.get_items(query="SELECT TOP 10 * FROM c ORDER BY c.timestamp DESC")
-    except Exception as e:
-        items = []
-        logger.error(f"Failed to fetch from Cosmos DB: {e}")
-    return render(request, 'webapp/cosmos_history.html', {'items': items})
-    
-    if not items:
-        messages.warning(request, "Cosmos DB service is currently unavailable. Showing no data.")
+    # Retrieve the 20 most recent entries in reverse chronological order (assuming the document contains a timestamp field).按时间倒序，取最近 20 条（假设文档中有 timestamp 字段）
+    query = "SELECT * FROM c ORDER BY c.timestamp DESC OFFSET 0 LIMIT 20"
+    items = cosmos.get_items(query=query)
+    return render(request, 'webapp/cosmos_history.html', {'cosmos_items': items})
