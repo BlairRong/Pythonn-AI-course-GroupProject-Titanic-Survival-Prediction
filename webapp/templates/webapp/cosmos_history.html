@@ -1,0 +1,31 @@
+{% extends "webapp/base.html" %}
+
+{% block content %}
+<h2>Cosmos DB Prediction History</h2>
+<table border="1" cellpadding="5">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>User</th>
+            <th>Passenger</th>
+            <th>Prediction</th>
+            <th>Probability</th>
+            <th>Timestamp</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.id }}</td>
+            <td>{{ item.userId }}</td>
+            <td>{{ item.passengerName }}</td>
+            <td>{{ item.prediction }}</td>
+            <td>{{ item.probability }}%</td>
+            <td>{{ item.timestamp }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6">No records found in Cosmos DB.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
