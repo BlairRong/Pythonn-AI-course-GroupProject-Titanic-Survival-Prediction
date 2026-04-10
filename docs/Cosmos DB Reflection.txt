@@ -1,22 +1,173 @@
 Cosmos DB lab Report
 
-## Data Flow Description (SQLite/Azure SQL vs Cosmos DB)
+Based on my implementation (Titanic Survival Prediction with Django + Azure SQL + Cosmos DB)
 
-In my Titanic Survival Prediction Django app, I use **Azure SQL Database** as the primary relational store for structured prediction records (passenger details, survival prediction, probability, rating, etc.). This is where the main application data lives and where the `PredictionRecord` model is persisted.
+---
 
-**Cosmos DB** is used alongside SQL as a secondary, flexible document store for the same prediction data. Every time a user submits a prediction form, the app writes a JSON document to Cosmos DB (in the `predictions` container) with the same key information. This allows me to experiment with a NoSQL database and later extend features like real‑time analytics or global replication without touching the core relational schema.
+## Part 1 – Decide What Goes into Cosmos DB
 
-When a user rates a prediction (1–5 stars), the rating is first saved to the SQL database (updating the `rating` column in `PredictionRecord`). Then, the same rating is pushed to Cosmos DB by updating the corresponding document using the same fixed partition key (`"titanic_app"`). The Cosmos DB history page (`/cosmos-history/`) reads all documents from Cosmos DB and displays them, including the rating if present.
+Since my project includes both a relational database (Azure SQL) and Cosmos DB (NoSQL), I have split the data as follows:
 
-**When SQL is used:**  
-- Primary data persistence  
-- Complex queries (filtering, ordering, pagination)  
-- Relationships (e.g., user sessions, admin interface)  
+### Data that remains in SQL (relational database)
+- **PredictionRecord** model (id, name, sex, age, pclass, fare, sibsp, parch, embarked, family_size, age_group, survived_prediction, probability, rating, created_at)
+- All structured, relational data that is frequently queried with filters, sorting, and pagination (e.g., prediction history list).
+- Data that requires **ACID transactions** (e.g., saving a prediction and updating rating in the same request).
+- Data that is used by Django’s admin interface and session management.
 
-**When Cosmos DB is used:**  
-- Secondary document store for the same predictions  
-- Demonstration of NoSQL integration  
-- Future use: fast global reads, schema‑flexible logging, offline sync
+### Data that is stored (or duplicated) in Cosmos DB
+- A **denormalised copy** of each prediction record, stored as a JSON document.
+- The document includes: id, userId, passengerName, prediction (Survived/Perished), probability, inputData (pclass, sex, age, etc.), timestamp, and rating (when updated).
+
+### Justification
+
+**Why move this data to Cosmos DB (NoSQL)?**
+
+1. **Flexible schema** – Cosmos DB allows me to store additional fields (e.g., `userId`, `passengerName`) without migrating the relational table. In the future, I can add new fields like `deviceInfo`, `location`, or `sessionId` without any schema changes.
+
+2. **Read‑heavy analytics** – The `/cosmos-history/` page demonstrates a simple read operation. For real‑time analytics or dashboards, Cosmos DB’s low‑latency reads and global distribution would be beneficial.
+
+3. **Scalability** – If the application grows to millions of predictions, Cosmos DB can scale horizontally with automatic partitioning, while SQL scaling is more expensive and complex.
+
+4. **Event sourcing / activity logs** – Each prediction can be treated as an immutable event. Cosmos DB is excellent for storing event streams and time‑series data.
+
+5. **Separation of concerns** – The relational database remains the source of truth for transactional operations, while Cosmos DB serves as a secondary store for read‑optimised views, logs, or integration with other services.
+
+**Why not keep everything in SQL?**
+
+- SQL is not ideal for storing semi‑structured or evolving data (e.g., additional metadata per prediction).
+- Writing to SQL is fine, but reading large volumes of historical data for analytics can be slow and expensive.
+- Cosmos DB offers native JSON support, automatic indexing, and global replication, which would be difficult to achieve with SQL alone.
+
+
+
+
+
+
+---
+
+## Part 2 – Architecture Design
+
+### How the system works (both SQL and Cosmos DB)
+
+My Django application uses **two databases side by side**:
+
+- **Azure SQL Database** – primary transactional store (relational).
+- **Azure Cosmos DB** – secondary document store (NoSQL).
+
+### Data flow
+
+1. **User submits a prediction form** (`PredictionFormView`):
+   - Data is validated by Django form.
+   - Prediction is calculated using the ML model.
+   - The result is saved to **SQL** (`PredictionRecord` table).
+   - Immediately after, the same data is converted to a JSON document and written to **Cosmos DB** (container `predictions`, partition key `userId` → fixed as `"titanic_app"`).
+   - If Cosmos DB write fails, the error is logged but the user is not interrupted.
+
+2. **User views prediction history** (`/predictions/`):
+   - Reads data exclusively from **SQL** (ordered by date, paginated).
+   - This is the main UI for users to see their past predictions.
+
+3. **User rates a prediction** (`submit_rating`):
+   - Rating is saved to **SQL** first (updating the `rating` column).
+   - Then, the same rating is updated in the corresponding Cosmos DB document (using the same partition key and document id).
+   - If Cosmos DB update fails, only SQL is updated; consistency is logged.
+
+4. **User views Cosmos DB history** (`/cosmos-history/`):
+   - Reads all documents from **Cosmos DB** (using a SQL‑like query).
+   - This page demonstrates the NoSQL read path and shows the same data (including ratings) as a separate view.
+
+### When SQL is used
+- All write operations (create, update) for the core `PredictionRecord` model.
+- Read operations for the main history list (ordering, pagination, filtering).
+- Admin interface and user session management.
+
+### When Cosmos DB is used
+- Secondary write (duplicate) of each prediction document.
+- Update of rating in the document.
+- Read operations for the dedicated `/cosmos-history/` page.
+- Future use: real‑time analytics, global read replicas, or integration with Azure Functions.
+
+### Diagram (text description)
+
+```
+User → Prediction Form → Django View
+                              ↓
+                         Azure SQL (primary)
+                              ↓
+                         (if success) → Cosmos DB (secondary)
+
+User → Rating Form → Django View
+                        ↓
+                   Azure SQL (update rating)
+                        ↓
+                   (if success) → Cosmos DB (update rating)
+
+User → History Page → Django View → Azure SQL → HTML
+User → Cosmos History Page → Django View → Cosmos DB → HTML
+```
+
+This architecture allows me to keep the benefits of a relational database for transactional integrity while exploring the advantages of a NoSQL document store for read‑heavy, schema‑flexible scenarios.
+
+
+
+
+
+
+
+
+---
+
+## Part 5 – Handle Challenges
+
+### 1. What happens if Cosmos DB is unavailable?
+
+In my implementation, all Cosmos DB operations (write after prediction, update rating) are wrapped in `try/except` blocks. If Cosmos DB is unavailable or an error occurs, the exception is caught, logged to the console/logger, and **the main application flow continues unaffected**. The user still receives their prediction result and can submit ratings; the only consequence is that the data is not written to Cosmos DB. This design ensures that the core functionality (survival prediction) is never blocked by an optional secondary service.
+
+**Example from code:**
+```python
+try:
+    cosmos = CosmosService()
+    cosmos.create_item(cosmos_item)
+except Exception as e:
+    logger.error(f"Cosmos DB error: {e}")
+    # No re-raise – the user is not interrupted
+```
+
+If Cosmos DB is unavailable for reading (`cosmos_history` page), the view will either show an empty list or raise an exception – but since this is a separate read‑only page, it does not affect the main prediction workflow.
+
+---
+
+### 2. How do you validate data before saving?
+
+Before saving to both SQL and Cosmos DB, I rely on **Django’s built‑in form validation** (`PredictionForm`). The form checks that required fields are present, data types are correct (e.g., age as integer, fare as decimal), and any custom validation logic (e.g., age range) is applied. This ensures that only valid data enters the system.
+
+Additionally, before writing to Cosmos DB, I manually convert certain fields (e.g., `fare` from `Decimal` to `float`) to ensure JSON serialisation works. I also check for `None` values and provide defaults where appropriate.
+
+**Key validation points:**
+- Django Form `is_valid()` – prevents invalid data from reaching the database.
+- Manual type conversion – ensures JSON compatibility for Cosmos DB.
+- Null handling – e.g., `fare` default to `0.0` if missing.
+
+---
+
+### 3. How do you handle consistency between SQL and NoSQL?
+
+My system uses **eventual consistency** with a **SQL‑first** strategy. The authoritative source of truth is the **Azure SQL Database** (or SQLite during development). Cosmos DB is treated as a secondary, denormalised copy for read‑only display and future scalability experiments.
+
+**Consistency approach:**
+- **Write order:** First, data is saved to SQL. Only after successful SQL commit, the same data is written to Cosmos DB. This guarantees that the primary store always has the latest information.
+- **Failure handling:** If Cosmos DB write fails, SQL data remains unchanged, and the inconsistency is logged. No automatic retry or back‑sync is implemented (for this lab, it is acceptable because Cosmos DB is not critical).
+- **Reads:** The main application reads from SQL. The `/cosmos-history/` page reads from Cosmos DB separately – it may temporarily show missing or outdated data if Cosmos DB write failed earlier.
+- **Updates (rating):** When a user submits a rating, the SQL record is updated first. Then, using the same fixed partition key (`"titanic_app"`), the corresponding Cosmos DB document is updated. If the Cosmos DB update fails, the rating remains correct in SQL, and the inconsistency is logged.
+
+**In a production system,** I would implement a background queue (e.g., using Celery or Azure Service Bus) to retry failed Cosmos DB writes, or use Cosmos DB’s change feed to sync from SQL. However, for this lab, the current approach clearly demonstrates the trade‑offs and is sufficient to meet the requirements.
+
+
+
+
+
+
+
 
 ---
 
