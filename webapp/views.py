@@ -14,6 +14,9 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from azure.storage.blob import BlobServiceClient
 
+from .cosmos_service import CosmosService
+from datetime import datetime, timezone
+
 # To train the model-  python -m ML.model_training.train
 # Set up logging to catch errors in the console/logs
 logger = logging.getLogger(__name__)
@@ -120,6 +123,35 @@ class PredictionFormView(FormView):
             prediction.probability = round(pred_proba, 2)
 
             prediction.save()
+            
+            #=====after prediction successfull and save into Azure Consmos DB======
+            #在 PredictionFormView 的 form_valid 方法中，在预测成功并保存到 SQLite 数据库后，再调用 Cosmos DB 服务写入一条记录。
+            passenger_name = self.request.session.get("last_passenger_name", "Unknown")
+            try:
+                cosmos = CosmosService()
+                cosmos_item = {
+                    "id": f"pred_{prediction.pk}",           # 唯一ID
+                    "userId": self.request.user.username if self.request.user.is_authenticated else "anonymous",
+                    "passengerName": passenger_name,          # 从 session 获取
+                    "prediction": "Survived" if prediction.survived_prediction else "Perished",
+                    "probability": prediction.probability,
+                    "inputData": {
+                        "pclass": prediction.pclass,
+                        "sex": prediction.sex,
+                        "age": prediction.age,
+                        "sibsp": prediction.sibsp,
+                        "parch": prediction.parch,
+                        "fare": prediction.fare,
+                        "embarked": prediction.embarked,
+                    },
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                cosmos.create_item(cosmos_item)
+            except Exception as e:
+                logger.error(f"Cosmos DB error: {e}")
+        # ========================================
+            
+            
             return redirect("prediction_result", pk=prediction.pk)
         
         except ValueError as ve:
@@ -183,3 +215,6 @@ def upload_file(request):
         message = f"file {uploaded_file.name} uploaded to Azure Storage"
     
     return render(request, 'webapp/upload.html', {'message': message})
+
+
+
