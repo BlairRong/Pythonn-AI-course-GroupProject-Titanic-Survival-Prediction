@@ -1,0 +1,151 @@
+Cosmos DB lab Report
+
+## Data Flow Description (SQLite/Azure SQL vs Cosmos DB)
+
+In my Titanic Survival Prediction Django app, I use **Azure SQL Database** as the primary relational store for structured prediction records (passenger details, survival prediction, probability, rating, etc.). This is where the main application data lives and where the `PredictionRecord` model is persisted.
+
+**Cosmos DB** is used alongside SQL as a secondary, flexible document store for the same prediction data. Every time a user submits a prediction form, the app writes a JSON document to Cosmos DB (in the `predictions` container) with the same key information. This allows me to experiment with a NoSQL database and later extend features like real‑time analytics or global replication without touching the core relational schema.
+
+When a user rates a prediction (1–5 stars), the rating is first saved to the SQL database (updating the `rating` column in `PredictionRecord`). Then, the same rating is pushed to Cosmos DB by updating the corresponding document using the same fixed partition key (`"titanic_app"`). The Cosmos DB history page (`/cosmos-history/`) reads all documents from Cosmos DB and displays them, including the rating if present.
+
+**When SQL is used:**  
+- Primary data persistence  
+- Complex queries (filtering, ordering, pagination)  
+- Relationships (e.g., user sessions, admin interface)  
+
+**When Cosmos DB is used:**  
+- Secondary document store for the same predictions  
+- Demonstration of NoSQL integration  
+- Future use: fast global reads, schema‑flexible logging, offline sync
+
+---
+
+## Part 6 – Reflection Answers
+
+**1. What worked well with Cosmos DB?**
+
+The integration was smooth once the connection string and keys were set up. The `azure-cosmos` Python SDK is well documented, and the `CosmosClient` works intuitively. Writing and reading JSON documents is straightforward, and the ability to query using SQL-like syntax made it easy to adapt. The Data Explorer in Azure portal is very helpful for debugging.
+
+**2. What was difficult?**
+
+The most challenging part was handling data type conversions – specifically, the `Decimal` type from SQL Server cannot be directly serialised to JSON. I had to explicitly convert `fare` to `float` before writing to Cosmos DB. Another difficulty was choosing and consistently using the partition key. Initially I used `userId` (which could be empty), causing errors when updating documents. I finally settled on a fixed partition key `"titanic_app"` to simplify the process.
+
+**3. When would you NOT use Cosmos DB?**
+
+I would not use Cosmos DB for:
+- Small applications with low traffic and simple data needs (SQLite or a traditional SQL database would be cheaper and easier).
+- Applications that require complex multi‑table joins or transactions across many entities (relational databases are better suited).
+- Projects with very tight budgets and predictable, low‑volume workloads – the serverless Cosmos DB tier is affordable, but a single SQL database may be even cheaper.
+
+**4. How would your system behave at scale?**
+
+With millions of users, Cosmos DB would automatically scale horizontally using partitions. My chosen fixed partition key (`"titanic_app"`) would become a **hot partition** because all documents would go to the same logical partition, limiting throughput. That design is not scalable. In production, I would use a more distributed partition key, such as `userId` (if users are logged in) or a random suffix to spread writes evenly. The relational database (Azure SQL) would also need scaling (e.g., using Hyperscale tier or read replicas), but it would likely become a bottleneck earlier than Cosmos DB.
+
+**5. Would you redesign anything?**
+
+Yes. I would:
+- Use a **dynamic partition key** (e.g., `userId` or a hash of `id`) to avoid hot partitions.
+- Move the Cosmos DB credentials to Azure Key Vault instead of `.env` for better security.
+- Implement a **retry policy** with exponential backoff for transient failures.
+- Possibly use **Change Feed** to sync data from Cosmos DB back to SQL or trigger serverless functions.
+
+---
+
+## Final Checklist for My Lab Report
+
+- [x] Installed SDK and created connection module  
+- [x] Stored credentials securely (`.env`)  
+- [x] Wrote data to Cosmos DB (predictions)  
+- [x] Read data from Cosmos DB (`cosmos_history` view)  
+- [x] Displayed data in UI (cosmos_history.html)  
+- [x] Integrated Cosmos DB into a real feature (prediction form and rating)  
+- [x] Handled errors (try/except for Decimal conversion and connection issues)  
+- [x] Described data flow (SQL vs Cosmos DB)  
+- [x] Answered reflection questions  
+
+
+
+
+## 数据流描述（SQLite/Azure SQL 与 Cosmos DB）
+
+在我的泰坦尼克号生存预测 Django 应用中，我使用 **Azure SQL 数据库** 作为结构化预测记录（乘客详情、生存预测、概率、评分等）的主要关系型数据库。应用的主要数据都存储在这里，`PredictionRecord` 模型也持久化存储于此。
+
+**Cosmos DB** 与 SQL 并行使用，作为用于存储相同预测数据的辅助、灵活的文档型数据库。每次用户提交预测表单时，应用都会将包含相同关键信息的 JSON 文档写入 Cosmos DB（位于 `predictions` 容器中）。这使我能够尝试使用 NoSQL 数据库，并在之后扩展实时分析或全局复制等功能，而无需修改核心关系模式。
+
+当用户对预测进行评分（1-5 星）时，评分首先保存到 SQL 数据库（更新 `PredictionRecord` 中的 `rating` 列）。然后，通过使用相同的固定分区键（`"titanic_app"`）更新相应的文档，将相同的评分推送到 Cosmos DB。Cosmos DB 历史记录页面（`/cosmos-history/`）会从 Cosmos DB 读取所有文档并显示它们，包括评分（如果有）。
+
+**使用 SQL 时：**
+
+- 主要数据持久化
+
+- 复杂查询（过滤、排序、分页）
+
+- 关系（例如，用户会话、管理界面）
+
+**使用 Cosmos DB 时：**
+
+- 用于相同预测的辅助文档存储
+
+- NoSQL 集成演示
+
+- 未来用途：快速全局读取、灵活的模式日志记录、离线同步
+
+---
+
+## 第 6 部分 – 反思答案
+
+**1. Cosmos DB 的哪些方面表现出色？**
+
+一旦设置好连接字符串和键，集成过程就非常顺利。 `azure-cosmos` Python SDK 文档齐全，`CosmosClient` 的使用也非常直观。读写 JSON 文档非常简单，而且能够使用类似 SQL 的语法进行查询，这使得上手非常容易。Azure 门户中的数据资源管理器对调试非常有帮助。
+
+**2. 遇到的困难是什么？**
+
+最具挑战性的部分是处理数据类型转换——具体来说，SQL Server 中的 `Decimal` 类型无法直接序列化为 JSON。我必须在写入 Cosmos DB 之前显式地将 `fare` 转换为 `float`。另一个困难是选择并始终如一地使用分区键。最初我使用了 `userId`（它可以为空），这导致在更新文档时出现错误。最终，我决定使用固定的分区键 `"titanic_app"` 来简化流程。
+
+**3. 什么情况下不建议使用 Cosmos DB？**
+
+以下情况不建议使用 Cosmos DB：
+
+- 流量较低、数据需求简单的应用程序（SQLite 或传统的 SQL 数据库更便宜也更容易）。
+
+- 需要复杂多表连接或跨多个实体的事务的应用程序（关系型数据库更适合）。
+
+- 预算非常紧张且工作负载可预测、低容量的项目——无服务器 Cosmos DB 层价格实惠，但单个 SQL 数据库可能更便宜。
+
+**4. 您的系统在大规模部署时会如何运行？**
+
+面对数百万用户，Cosmos DB 会使用分区自动进行横向扩展。我选择的固定分区键（`"titanic_app"`）会成为**热分区**，因为所有文档都会写入同一个逻辑分区，从而限制吞吐量。这种设计不具备可扩展性。在生产环境中，我会使用更分散的分区键，例如 `userId`（如果用户已登录）或随机后缀，以均匀分散写入。关系型数据库（Azure SQL）也需要扩展（例如，使用超大规模层或只读副本），但它可能比 Cosmos DB 更早成为瓶颈。
+
+**5.你会重新设计什么吗？
+
+是的。我会：
+
+- 使用**动态分区键**（例如，`userId` 或 `id` 的哈希值）来避免出现热分区。
+
+- 将 Cosmos DB 凭据从 `.env` 文件移至 Azure Key Vault，以提高安全性。
+
+- 针对瞬态故障实施**指数退避重试策略**。
+
+- 可能使用**变更源**将数据从 Cosmos DB 同步回 SQL 或触发无服务器函数。
+
+---
+
+## 实验报告最终检查清单
+
+- [x] 已安装 SDK 并创建连接模块
+
+- [x] 已安全存储凭据（`.env` 文件）
+
+- [x] 已将数据写入 Cosmos DB（预测数据）
+
+- [x] 已从 Cosmos DB 读取数据（`cosmos_history` 视图）
+
+- [x] 已在用户界面 (`cosmos_history.html`) 中显示数据
+
+- [x] 已将 Cosmos DB 集成到实际功能中（预测表单和评分）
+
+- [x] 已处理错误（尝试/排除十进制转换和连接问题）
+
+- [x] 已描述数据流（SQL 与 Cosmos DB）
+
+- [x] 已回答反思问题

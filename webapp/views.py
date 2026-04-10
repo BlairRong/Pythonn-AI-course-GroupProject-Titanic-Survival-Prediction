@@ -14,8 +14,6 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from azure.storage.blob import BlobServiceClient
 
-from .cosmos_service import CosmosService
-from datetime import datetime, timezone
 
 # To train the model-  python -m ML.model_training.train
 # Set up logging to catch errors in the console/logs
@@ -126,13 +124,19 @@ class PredictionFormView(FormView):
             
             #=====after prediction successfull and save into Azure Consmos DB======
             #在 PredictionFormView 的 form_valid 方法中，在预测成功并保存到 SQLite 数据库后，再调用 Cosmos DB 服务写入一条记录。
-            passenger_name = self.request.session.get("last_passenger_name", "Unknown")
+            
+            from .cosmos_service import CosmosService
+            from datetime import datetime, timezone
+            from django.conf import settings
+            print("COSMOS_DB_URL:", settings.COSMOS_DB_URL)
+            print("COSMOS_DB_KEY length:", len(settings.COSMOS_DB_KEY))
+            
             try:
                 cosmos = CosmosService()
                 cosmos_item = {
                     "id": f"pred_{prediction.pk}",           # 唯一ID
                     "userId": "titanic_app", #self.request.user.username if self.request.user.is_authenticated else "anonymous",
-                    "passengerName": passenger_name,          # 从 session 获取
+                    "passengerName": self.request.session.get("last_passenger_name", "Unknown"),
                     "prediction": "Survived" if prediction.survived_prediction else "Perished",
                     "probability": prediction.probability,
                     "inputData": {
@@ -141,14 +145,16 @@ class PredictionFormView(FormView):
                         "age": prediction.age,
                         "sibsp": prediction.sibsp,
                         "parch": prediction.parch,
-                        "fare": prediction.fare,
+                        "fare": float(prediction.fare) if prediction.fare is not None else 0.0,
                         "embarked": prediction.embarked,
                     },
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 }
                 cosmos.create_item(cosmos_item)
+                print("✅ Cosmos DB write successful for prediction", prediction.pk)  # 添加这行
             except Exception as e:
                 logger.error(f"Cosmos DB error: {e}")
+                print(f"Cosmos DB error: {e}")
         # ========================================
             
             
@@ -181,7 +187,7 @@ def submit_rating(request, pk):
                 # The partition key needs to be consistent with the one used during creation (e.g., the userId field). If your document does not have a userId, you can temporarily use a fixed value.分区键需要与创建时一致（例如 userId 字段）。如果你的文档中没有 userId，可以暂时用固定值
                 # Option 1: Retrieve the userId from the prediction object (if the model has this field and it has been saved).方案1：从 prediction 对象中获取 userId（如果模型中有该字段，且已保存）
                 # Option 2: Use the default partition key "unknown"方案2：使用默认分区键 "unknown"
-                partition_key_value = "titanic_app"    #getattr(prediction, 'user_id', 'unknown')  # 如果 PredictionRecord 有 user_id 字段
+                partition_key_value = "titanic_app"  # 如果 PredictionRecord 有 user_id 字段
                 # Read document 读取文档
                 item = cosmos.container.read_item(item=item_id, partition_key=partition_key_value)
                 item['rating'] = int(rating)
@@ -235,11 +241,9 @@ def upload_file(request):
 
 #Azure Comsmos Architecture Design.
 #Create and display a view that reads data from Cosmos DB.创建读取 Cosmos DB 数据并显示的视图
+from .cosmos_service import CosmosService
 
 def cosmos_history(request):
-    #Displays the prediction records stored in Cosmos DB.显示 Cosmos DB 中存储的预测记录
     cosmos = CosmosService()
-    # Retrieve the 20 most recent entries in reverse chronological order (assuming the document contains a timestamp field).按时间倒序，取最近 20 条（假设文档中有 timestamp 字段）
-    query = "SELECT * FROM c ORDER BY c.timestamp DESC OFFSET 0 LIMIT 20"
-    items = cosmos.get_items(query=query)
+    items = cosmos.get_items(query="SELECT * FROM c ORDER BY c.timestamp DESC")
     return render(request, 'webapp/cosmos_history.html', {'cosmos_items': items})

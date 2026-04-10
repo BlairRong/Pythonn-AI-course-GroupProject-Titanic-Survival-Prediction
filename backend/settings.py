@@ -10,11 +10,13 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
+
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -168,6 +170,8 @@ COSMOS_DB_KEY = os.environ.get('COSMOS_DB_KEY', '')
 COSMOS_DB_DATABASE = 'titanicDB'
 COSMOS_DB_CONTAINER = 'predictions'
 
+print("COSMOS_DB_URL from env:", os.environ.get('COSMOS_DB_URL'))
+print("COSMOS_DB_KEY from env:", os.environ.get('COSMOS_DB_KEY'))
 
 #terminal: export COSMOS_DB_URL="my URI"
 #terminal: export COSMOS_DB_KEY="my KEY"

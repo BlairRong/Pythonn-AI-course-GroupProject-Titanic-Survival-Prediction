@@ -11,6 +11,7 @@
       <th>Family Size</th>
       <th>Prediction</th>
       <th>Probability</th>
+      <th>Rating</th>
     </tr>
   </thead>
 
@@ -29,10 +30,17 @@
       </td>
 
       <td>{{ record.probability|floatformat:3 }}</td>
+      <td>
+            {% if record.rating %}
+                {{ record.rating }} ⭐
+            {% else %}
+                -
+            {% endif %}
+        </td>
     </tr>
     {% empty %}
     <tr>
-      <td colspan="7" class="text-center">No predictions yet.</td>
+      <td colspan="8" class="text-center">No predictions yet.</td>
     </tr>
     {% endfor %}
   </tbody>
