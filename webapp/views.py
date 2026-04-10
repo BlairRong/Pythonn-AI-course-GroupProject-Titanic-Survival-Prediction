@@ -228,3 +228,6 @@ def cosmos_history(request):
         items = []
         logger.error(f"Failed to fetch from Cosmos DB: {e}")
     return render(request, 'webapp/cosmos_history.html', {'items': items})
+    
+    if not items:
+        messages.warning(request, "Cosmos DB service is currently unavailable. Showing no data.")
