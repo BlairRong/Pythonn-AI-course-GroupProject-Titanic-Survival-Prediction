@@ -173,6 +173,22 @@ def submit_rating(request, pk):
             prediction.save()
             messages.success(request, "Thank you for rating! ⭐")
 
+            # ========== update Cosmos DB's rating ==========
+            try:
+                cosmos = CosmosService()
+                # Assumen Cosmos DB document's id file is "pred_{pk}"
+                item_id = f"pred_{prediction.pk}"
+                # The partition key needs to be consistent with the one used during creation (e.g., the userId field). If your document does not have a userId, you can temporarily use a fixed value.分区键需要与创建时一致（例如 userId 字段）。如果你的文档中没有 userId，可以暂时用固定值
+                # Option 1: Retrieve the userId from the prediction object (if the model has this field and it has been saved).方案1：从 prediction 对象中获取 userId（如果模型中有该字段，且已保存）
+                # Option 2: Use the default partition key "unknown"方案2：使用默认分区键 "unknown"
+                partition_key_value = getattr(prediction, 'user_id', 'unknown')  # 如果 PredictionRecord 有 user_id 字段
+                # Read document 读取文档
+                item = cosmos.container.read_item(item=item_id, partition_key=partition_key_value)
+                item['rating'] = int(rating)
+                cosmos.container.upsert_item(item)
+            except Exception as e:
+                logger.error(f"Failed to update Cosmos DB rating: {e}")
+            # ===============================================
     return redirect("prediction_result", pk=pk)
 
 
